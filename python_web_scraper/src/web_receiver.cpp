@@ -1,5 +1,6 @@
 #include <python_web_scraper/Vector4.h>
 #include <geometry_msgs/Twist.h>
+#include <std_msgs/Int8.h>
 #include <ros/ros.h>
 #include <cstdarg>
 #include <string>
@@ -60,6 +61,11 @@ bool isaWinner(const score_set scores) {
 	}
 } 
 
+void difficultyCallback(const std_msgs::Int8 difficulty) {
+	mode = (enum difficulty)(difficulty.data);
+	print("New difficulty is: %d", difficulty.data);
+}
+
 void scoreCallback(const score_set updatedScores) {
 	print("Received an updated score");
 
@@ -113,6 +119,7 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "web_receiver");
 	ros::NodeHandle n;
 
+	ros::Subscriber difficultySubscriber = n.subscribe("/web_pub/difficulty", 10, difficultyCallback);
 	ros::Subscriber scoreSubscriber = n.subscribe("/web_pub/scores", 10, scoreCallback);
 	ros::Publisher velocityPublisher = n.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1000);
 
@@ -144,12 +151,15 @@ int main(int argc, char **argv)
 
 		switch(mode) {
 			case EASY:
-				twist.linear.x = 0.15;
-				twist.angular.z = 0.4;
+				//twist.linear.x = 0.15;
+				//twist.angular.z = 0.4;
+				print("Moving based on easy");
 				break;
 			case MEDIUM:
+				print("Moving based on medium");
 				break;
 			case HARD:
+				print("Moving based on hard");
 				break;
 		}
 		velocityPublisher.publish(twist);

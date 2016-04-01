@@ -48,6 +48,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   Vector4.msg
+  Difficulty.msg
 )
 
 ## Generate services in the 'srv' folder
