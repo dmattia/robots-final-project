@@ -48,3 +48,5 @@ if __name__ == '__main__':
         web_pub()
     except rospy.ROSInterruptException:
         pass
+    except:
+			web_pub()
