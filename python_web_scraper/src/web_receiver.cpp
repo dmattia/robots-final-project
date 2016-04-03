@@ -1,6 +1,7 @@
 #include <python_web_scraper/Vector4.h>
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/Int8.h>
+#include <std_msgs/String.h>
 #include <ros/ros.h>
 #include <cstdarg>
 #include <string>
@@ -39,8 +40,11 @@ void print(const char *format...) {
 	}
 }
 
-void playSong(const std::string filename) {
-	print("Playing sound file: %s", filename.c_str());
+ros::Publisher sound_pub;
+void playSong(const std::string str) {
+	std_msgs::String sound_str;
+	sound_str.data = str;
+	sound_pub.publish(sound_str);
 }
 
 bool isaWinner(const score_set scores) {
@@ -75,16 +79,16 @@ void scoreCallback(const score_set updatedScores) {
 	print("	 Yellow score: %d", updatedScores.yellow);
 
 	if (updatedScores.blue > previousScores.blue) {
-		playSong("blue.mp3");
+		playSong("Ravenclaw Scored. yay");
 	}
 	if (updatedScores.green > previousScores.green) {
-		playSong("green.mp3");
+		playSong("Slitherin Scored. yay");
 	}
 	if (updatedScores.red > previousScores.red) {
-		playSong("red.mp3");
+		playSong("Griffindoor Scored. yay");
 	}
 	if (updatedScores.yellow > previousScores.yellow) {
-		playSong("yellow.mp3");
+		playSong("Hufflepuff Scored. yay");
 	}
 	if (isaWinner(updatedScores)) {
 		game_won = true;
@@ -96,22 +100,23 @@ void scoreCallback(const score_set updatedScores) {
 void celebrate(enum player winningPlayer) {
 	switch(winningPlayer) {
 		case RED:
-			print("Red won");
+			playSong("Griffindoor won");
 			break;
 		case BLUE:
-			print("Blue won");
+			playSong("Ravenclaw won");
 			break;
 		case GREEN:
-			print("Green won");
+			playSong("Slitherin won");
 			break;
 		case YELLOW:
-			print("Yellow won");
+			playSong("Hufflepuff won");
 			break;
 	}
 }
 
 void endWithoutWinner() {
 	print("Time expired before anyone could win");
+	playSong("Time expired before anyone could win");
 }
 
 int main(int argc, char **argv)
@@ -122,6 +127,7 @@ int main(int argc, char **argv)
 	ros::Subscriber difficultySubscriber = n.subscribe("/web_pub/difficulty", 10, difficultyCallback);
 	ros::Subscriber scoreSubscriber = n.subscribe("/web_pub/scores", 10, scoreCallback);
 	ros::Publisher velocityPublisher = n.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1000);
+	sound_pub = n.advertise<std_msgs::String>("sound_to_play", 1000);
 
 	geometry_msgs::Twist twist;
 	time_t startTime = time(NULL);
@@ -151,15 +157,16 @@ int main(int argc, char **argv)
 
 		switch(mode) {
 			case EASY:
-				//twist.linear.x = 0.15;
-				//twist.angular.z = 0.4;
-				print("Moving based on easy");
+				twist.linear.x = 0.15;
+				twist.angular.z = 0.4;
 				break;
 			case MEDIUM:
-				print("Moving based on medium");
+				twist.linear.x = 0.15;
+				twist.angular.z = 0.4;
 				break;
 			case HARD:
-				print("Moving based on hard");
+				twist.linear.x = 0.15;
+				twist.angular.z = 0.4;
 				break;
 		}
 		velocityPublisher.publish(twist);
