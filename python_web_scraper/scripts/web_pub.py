@@ -16,11 +16,25 @@ class Difficulty(Enum):
     HARD = 2
 
 def playSound(data):
+	""" Function Name: playSound
+		Parameters: data (A string to be converted to speech)
+		Returns: None
+	
+		Description: Sends @data to the sound_play node to be spoken
+	"""
     soundhandle = SoundClient()
     soundhandle.say(data.data)
 
 lastTwist = Twist()
 def updateMovement(data):
+	# FOR iOS TELEOP, NOT FOR PROJECT
+	""" Function Name: updateMovement
+		Parameters: data (Twist object containing data for teleop)
+		Returns: None
+	
+		Description: Checks if any data has changed since the last time this function was
+			called.  Publishes the data to the C++ node if it has
+	"""
     if lastTwist.linear.x != data.linear.x or lastTwist.angular.z != data.angular.z:
     	teleop_publisher = rospy.Publisher('cmd_vel_mux/input/teleop', Twist, queue_size=10)
     	teleop_publisher.publish(data)
@@ -28,6 +42,14 @@ def updateMovement(data):
     lastTwist.angular.z = data.angular.z
 
 def web_pub():
+	""" Function Name: web_pub
+		Parameters: none
+		Returns: None
+	
+		Description: Main function for the python node.
+			Sets up publishers and subscribers.
+			Scrapes the firebase database for updates in the iOS app.
+	"""
     rospy.init_node('web_pub', anonymous=True)
 
     score_publisher = rospy.Publisher('/web_pub/scores', Vector4, queue_size=10)
@@ -84,7 +106,7 @@ def web_pub():
 	    scores.green = players['Green Player']
 	    scores.red = players['Red Player']
 	    scores.yellow = players['Yellow Player']
-	    score_publisher.publish(scores)
+	    score_publisher.publish(scores) # to C++ node
 
 	rate.sleep()
 

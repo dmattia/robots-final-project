@@ -9,6 +9,18 @@
 #include <string>
 #include <ctime>
 
+/************************************************************
+ * Name: web_receiver.cpp
+ * Author: David Mattia, Gina Gilmartin, Bridget Harrington,
+		   Daniel Huang
+ * Date: 4/03/16
+ *
+ * Description: This file acts as the arbitrator for the entire
+ *		application.  It takes in data from the python node,
+ *		makes decisions on what the robot should do, and sends
+ *		messages to the robot.
+ ***********************************************************/
+
 // Global data structures
 enum player {
 	BLUE,
@@ -31,10 +43,19 @@ enum difficulty mode = EASY;
 score_set previousScores = score_set();
 enum player winner;
 time_t lastScored;
+float speedIncrease = 0.0;
 
 bool hasSetFirstPoint = false;
 pcl::PointXYZ closestPoint;
 
+/************************************************************
+ * Function Name: pclCallback
+ * Parameters: PointCloud::ConstPtr cloud
+ * Returns: void
+ *
+ * Description: Updates the global variable @closestPoint
+ * 		to contain the closest point cloud data point to the robot
+ ***********************************************************/
 void pclCallback(const PointCloud::ConstPtr& cloud)
 {
    float min_z = 1e6;
@@ -48,16 +69,32 @@ void pclCallback(const PointCloud::ConstPtr& cloud)
    }
 }
 
+/************************************************************
+ * Function Name: print
+ * Parameters: const char *format...
+ * Returns: void
+ *
+ * Description: Prints a string if the global variable
+ *		@should_print is true
+ ***********************************************************/
 void print(const char *format...) {
 	if (should_print) {
 		va_list argptr;
     	va_start(argptr, format);
-   	vfprintf(stdout, format, argptr);
+		vfprintf(stdout, format, argptr);
     	va_end(argptr);
 		printf("\n");
 	}
 }
 
+/************************************************************
+ * Function Name: playSong
+ * Parameters: const std::string str
+ * Returns: void
+ *
+ * Description: Publishes a string @str to the python node
+ *		to be converted into a sound
+ ***********************************************************/
 ros::Publisher sound_pub;
 void playSong(const std::string str) {
 	std_msgs::String sound_str;
@@ -65,6 +102,15 @@ void playSong(const std::string str) {
 	sound_pub.publish(sound_str);
 }
 
+/************************************************************
+ * Function Name: isaWinner
+ * Parameters: const score_set scores
+ * Returns: bool if a player has won or not
+ *
+ * Description: Determines if there is a winner yet.
+ *		If there is, it updates global variable @winner
+ *		to hold who won. Otherwise, returns false
+ ***********************************************************/
 bool isaWinner(const score_set scores) {
 	if (scores.blue == 10) {
 		winner = BLUE;
@@ -83,6 +129,13 @@ bool isaWinner(const score_set scores) {
 	}
 } 
 
+/************************************************************
+ * Function Name: whoWon
+ * Parameters: const score_set scores
+ * Returns: the player that won (enum player)
+ *
+ * Description: Determines who won the game when time expires
+ ***********************************************************/
 enum player whoWon(const score_set scores) {
 	int playerScores[] = {scores.blue, scores.green, scores.red, scores.yellow};
 	int maxScoreIndex = 0;
@@ -94,11 +147,33 @@ enum player whoWon(const score_set scores) {
 	return (enum player)(maxScoreIndex);
 }
 
+/************************************************************
+ * Function Name: difficultyCallback
+ * Parameters: const std_msgs::Int8 difficulty
+ * Returns: void
+ *
+ * Description: Called whenever the score is changed on the
+ * 		iOS app.  Updates global var @mode to hold the new 
+ *		difficulty
+ ***********************************************************/
 void difficultyCallback(const std_msgs::Int8 difficulty) {
 	mode = (enum difficulty)(difficulty.data);
 	print("New difficulty is: %d", difficulty.data);
 }
 
+/************************************************************
+ * Function Name: scoreCallback
+ * Parameters: const score_set updatedScores
+ * Returns: void
+ *
+ * Description: Determines if anyone has scored since the last
+ *		time this function was called, and sends a message
+ *		to the python node to announce audibly who scored.
+ *
+ * Note: Assumes that @updatedScores differs from the last
+ *		call to this function as all data should be first
+ *		filtered in the python node.
+ ***********************************************************/
 void scoreCallback(const score_set updatedScores) {
 	print("Received an updated score");
 
@@ -109,15 +184,19 @@ void scoreCallback(const score_set updatedScores) {
 
 	if (updatedScores.blue > previousScores.blue) {
 		playSong("Ten Points to Ravenclaw!");
+		speedIncrease += 0.3;
 	}
 	if (updatedScores.green > previousScores.green) {
 		playSong("Ten Points to Slitherin!");
+		speedIncrease += 0.3;
 	}
 	if (updatedScores.red > previousScores.red) {
 		playSong("Ten Points to Griffindoor!");
+		speedIncrease += 0.3;
 	}
 	if (updatedScores.yellow > previousScores.yellow) {
 		playSong("Ten Points to Hufflepuff!");
+		speedIncrease += 0.3;
 	}
 	if (isaWinner(updatedScores)) {
 		game_won = true;
@@ -126,6 +205,14 @@ void scoreCallback(const score_set updatedScores) {
 	previousScores = updatedScores;
 }
 
+/************************************************************
+ * Function Name: celebrate
+ * Parameters: enum player winningPlayer
+ * Returns: void
+ *
+ * Description: Takes in the winning player and announces
+ *		that that player won the game.
+ ***********************************************************/
 void celebrate(enum player winningPlayer) {
 	switch(winningPlayer) {
 		case RED:
@@ -143,7 +230,14 @@ void celebrate(enum player winningPlayer) {
 	}
 }
 
-// Returns one of 1000 values in [@min, @max]
+/************************************************************
+ * Function Name: randomValueInRange
+ * Parameters: float min, float max
+ * Returns: a random value in [@min, @max] (float)
+ *
+ * Description: Returns a random value in [@min, @max].
+ *		Generates 1000 possibilities in the range and returns 1
+ ***********************************************************/
 float randomValueInRange(float min, float max) {
 	int randValue = rand() % 1000;
 	float range = max - min;
@@ -151,11 +245,28 @@ float randomValueInRange(float min, float max) {
 	return min + (step * randValue);
 }
 
+/************************************************************
+ * Function Name: keepInRange
+ * Parameters: double &value, double min, double max
+ * Returns: void
+ *
+ * Description: Makes sure @value is in (@min, @max).  If it
+ *		is not, @value is updated to hold the closest value
+ *		that falls in this range.
+ ***********************************************************/
 void keepInRange(double &value, double min, double max) {
 	if (value < min) value = min;
 	if (value > max) value = max;
 }
 
+/************************************************************
+ * Function Name: dance
+ * Parameters: ros::Publisher velocityPublisher, ros::Rate loop_rate
+ * Returns: void
+ *
+ * Description: Makes the robot dance by quickly moving in
+ *		a circle and then reversing the direction and repeating
+ ***********************************************************/
 void dance(ros::Publisher velocityPublisher, ros::Rate loop_rate) {
 	geometry_msgs::Twist twist;
 	for(int i=0; i < 10; ++i) {
@@ -174,6 +285,14 @@ void dance(ros::Publisher velocityPublisher, ros::Rate loop_rate) {
 	}	
 }
 
+/************************************************************
+ * Function Name: main
+ * Parameters: int argc, char **argv
+ * Returns: success (int)
+ *
+ * Description:  main run loop for the program.
+ *		Acts as the arbitrator for game.
+ ***********************************************************/
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "web_receiver");
@@ -214,6 +333,8 @@ int main(int argc, char **argv)
 	bool isMedium = false;
 	bool objectIsClose = false;
 	bool shouldUseOldSpeed = false;
+
+	// Start runloop
 	while(ros::ok())
 	{
 		time_t timeElapsedSinceProgramBegan = time(NULL) - startTime;
@@ -241,13 +362,16 @@ int main(int argc, char **argv)
 						twist.linear.x = beforeObjectAvoidance;
 						shouldUseOldSpeed = false;
 					}
-					twist.linear.x -= 0.001;
+					twist.linear.x -= 0.001; // decrease the speed over time
+					twist.linear.x += speedIncrease; // increase the speed if players have performed well
 					keepInRange(twist.linear.x, 0.2, 0.7);
 					twist.angular.z = (1.0 * twist.linear.x) / 0.7;
 				}
 				break;
 			case HARD:
 				isMedium = false;
+				// Change the linear and angular speeds every @changeLimit frames
+				// Do not change the speed if an object is close
 				if (!(count++ % changeLimit) && !objectIsClose) {
 					twist.linear.x = randomValueInRange(0.2, 0.5);
 					twist.angular.z = randomValueInRange(-1.5, 1.5);
@@ -267,12 +391,14 @@ int main(int argc, char **argv)
 				} else {
 					objectIsClose = false;
 				}
+				twist.linear.x += speedIncrease; // increase the speed if players have performed well
 				break;
 		}
 		velocityPublisher.publish(twist);
 		ros::spinOnce();
 		loop_rate.sleep();
 
+		// Check if the game should end
 		if(game_won) {
 			celebrate(winner);
 			dance(velocityPublisher, loop_rate);
